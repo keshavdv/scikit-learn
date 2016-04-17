@@ -639,7 +639,7 @@ class BaseMultilayerPerceptron(six.with_metaclass(ABCMeta, BaseEstimator)):
     def _partial_fit(self, X, y, classes=None):
         return self._fit(X, y, incremental=True)
 
-    def _decision_scores(self, X):
+    def _decision_scores(self, X, intermediate=False):
         """Predict using the trained model
 
         Parameters
@@ -670,10 +670,13 @@ class BaseMultilayerPerceptron(six.with_metaclass(ABCMeta, BaseEstimator)):
             activations.append(np.empty((X.shape[0],
                                          layer_units[i + 1])))
         # forward propagate
-        self._forward_pass(activations, with_output_activation=False)
+        intermediate_values = self._forward_pass(activations, with_output_activation=False)
         y_pred = activations[-1]
 
-        return y_pred
+        if intermediate:
+            return (y_pred, intermediate_values)
+        else:
+            return y_pred
 
 
 class MLPClassifier(BaseMultilayerPerceptron, ClassifierMixin):
@@ -913,7 +916,7 @@ class MLPClassifier(BaseMultilayerPerceptron, ClassifierMixin):
         y = self.label_binarizer_.transform(y)
         return X, y
 
-    def decision_function(self, X):
+    def decision_function(self, X, intermediate=False):
         """Decision function of the mlp model
 
         Parameters
@@ -927,14 +930,17 @@ class MLPClassifier(BaseMultilayerPerceptron, ClassifierMixin):
             The values of decision function for each class in the model.
         """
         check_is_fitted(self, "coefs_")
-        y_scores = self._decision_scores(X)
+        if intermediate:
+            (y_scores, intermediate_values) = self._decision_scores(X, intermediate)
+        else:
+            y_scores = self._decision_scores(X, intermediate)
 
         if self.n_outputs_ == 1:
-            return y_scores.ravel()
+            return (y_scores.ravel(), intermediate_values) if intermediate else y_scores.ravel()
         else:
-            return y_scores
+            return (y_scores, intermediate_values) if intermediate else y_scores
 
-    def predict(self, X):
+    def predict(self, X, intermediate=False):
         """Predict using the multi-layer perceptron classifier
 
         Parameters
@@ -948,10 +954,17 @@ class MLPClassifier(BaseMultilayerPerceptron, ClassifierMixin):
             The predicted classes.
         """
         check_is_fitted(self, "coefs_")
-        y_scores = self.decision_function(X)
-        y_scores = ACTIVATIONS[self.out_activation_](y_scores)
-
-        return self.label_binarizer_.inverse_transform(y_scores)
+        if intermediate:
+            (y_scores, intermediate_values) = self.decision_function(X, intermediate)
+            
+        else:
+            y_scores = self.decision_function(X)
+        y_scores = ACTIVATIONS[self.out_activation_](y_scores)        
+        
+        if intermediate:
+            return (self.label_binarizer_.inverse_transform(y_scores), intermediate_values)
+        else:
+            return self.label_binarizer_.inverse_transform(y_scores)
 
     @property
     def partial_fit(self):
