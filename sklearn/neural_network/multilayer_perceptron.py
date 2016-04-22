@@ -6,6 +6,7 @@
 #          Jiyuan Qian
 # Licence: BSD 3 clause
 
+import copy
 import numpy as np
 
 from abc import ABCMeta, abstractmethod
@@ -671,7 +672,7 @@ class BaseMultilayerPerceptron(six.with_metaclass(ABCMeta, BaseEstimator)):
                                          layer_units[i + 1])))
         # forward propagate
         intermediate_values = self._forward_pass(activations, with_output_activation=False)
-        y_pred = activations[-1]
+        y_pred = copy.deepcopy(activations[-1])
 
         if intermediate:
             return (y_pred, intermediate_values)
